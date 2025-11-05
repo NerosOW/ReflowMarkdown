@@ -11,9 +11,30 @@ Format the current heading, paragraph, list, or blockquote to have lines no
 longer than your preferred line length, using the `alt+q` shortcut or your own
 user-specific keyboard-binding.
 
+Alternatively, you can register the extension as a formatter for Markdown files.
+This lets you reflow the entire document or a selected range using the built-in
+`Format Document` command.
+
 This extension defaults to reflowing lines to be no more than 80 characters
 long. The preferred line length may be overridden using the config value of
 `reflowMarkdown.preferredLineLength`.
+
+Setup
+-----
+
+To automatically reformat Markdown files on save, add the following to your user or
+workspace settings:
+
+```json
+"[markdown]": {
+    "editor.defaultFormatter": "marvhen.reflow-markdown",
+    "editor.formatOnSave": true
+}
+```
+
+To manually trigger formatting, set `formatOnSave` to `false` and use the
+`Format Document` command from the Command Palette (default shortcut: `shift+alt+f`).
+
 
 Extension Settings
 ------------------

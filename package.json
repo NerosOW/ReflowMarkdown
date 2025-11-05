@@ -82,7 +82,7 @@
       {
         "command": "reflow-markdown.reflowMarkdown",
         "key": "alt+q",
-        "when": "editorTextFocus && editorLangId == 'markdown'"
+        "when": "editorTextFocus"
       }
     ],
     "configurationDefaults": {
