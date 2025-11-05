@@ -11,7 +11,9 @@ import {
   OtherInfo
 } from "./testable";
 
-// Helper: detect front matter range at the top of the document.
+// Helper functions
+
+// Detect front matter range at the top of the document.
 // Supports YAML (--- ... --- or ...), and TOML (+++ ... +++).
 // If unterminated, treat front matter as extending to the end of the document (to avoid accidental edits).
 function getFrontMatterRange(document: vscode.TextDocument): vscode.Range | undefined {
@@ -40,7 +42,7 @@ function getFrontMatterRange(document: vscode.TextDocument): vscode.Range | unde
   return new vscode.Range(first, 0, lastLine, document.lineAt(lastLine).text.length);
 }
 
-// Helper: MDX import detection (matches `import X from "..."` and `import "..."`)
+// MDX import detection (matches `import X from "..."` and `import "..."`)
 const MDX_IMPORT_RE = /^\s*import\s+(?:[^'";]+?\s+from\s+)?['"][^'"]+['"]\s*;?\s*$/;
 function paragraphHasMdxImport(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
@@ -76,20 +78,20 @@ function getFirstContentParagraphRange(document: vscode.TextDocument): vscode.Ra
   return new vscode.Range(s.lineNumber, 0, e.lineNumber, document.lineAt(e.lineNumber).text.length);
 }
 
-// Helper: lines starting with ':::'
+// Lines starting with ':::'
 const TRIPLE_COLON_RE = /^\s*:::/;
 function lineStartsWithTripleColon(text: string): boolean {
   return TRIPLE_COLON_RE.test(text);
 }
 
-// Helper: lines that only contain an opening or closing XML tag or HTML comment
+// Lines that only contain an opening or closing XML tag or HTML comment
 const XML_TAG_ONLY_RE = /^\s*<\/?[a-zA-Z][a-zA-Z0-9\-]*(?:\s[^>]*)?\/?>\s*$/;
 const HTML_COMMENT_ONLY_RE = /^\s*<!--.*?-->\s*$/;
 function lineIsXmlTagOnly(text: string): boolean {
   return XML_TAG_ONLY_RE.test(text) || HTML_COMMENT_ONLY_RE.test(text);
 }
 
-// Helper: Markdown footnote or reference definition lines, e.g. `[tags]: /path` or `[^1]: text`
+// Markdown footnote or reference definition lines, e.g. `[tags]: /path` or `[^1]: text`
 const FOOTNOTE_DEF_RE = /^\s*\[\^?[^\]]+\]:[ \t]+/;
 function paragraphHasFootnoteDef(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
@@ -100,7 +102,7 @@ function paragraphHasFootnoteDef(document: vscode.TextDocument, startLine: numbe
   return false;
 }
 
-// Helper: lines that only contain a list symbol (- or *) and a Markdown link
+// Lines that only contain a list symbol (- or *) and a Markdown link
 const LIST_LINK_ONLY_RE = /^\s*[-*]\s+\[[^\]]*\]\([^)]*\)\.?\s*$/;
 function paragraphHasListLinkOnly(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
@@ -111,7 +113,7 @@ function paragraphHasListLinkOnly(document: vscode.TextDocument, startLine: numb
   return false;
 }
 
-// Helper: Markdown table detection (pipe rows and header separator lines)
+// Markdown table detection (pipe rows and header separator lines)
 const MD_TABLE_SEPARATOR_RE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
 const MD_TABLE_ROW_RE = /^\s*\|.*\|.*$/;
 function paragraphHasMarkdownTable(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
@@ -124,7 +126,7 @@ function paragraphHasMarkdownTable(document: vscode.TextDocument, startLine: num
   return false;
 }
 
-// Helper: ATX heading lines starting with up to 3 spaces and 1-6 '#'
+// ATX heading lines starting with up to 3 spaces and 1-6 '#'
 const ATX_HEADING_RE = /^\s{0,3}#{1,6}(?:\s|$)/;
 function paragraphHasAtxHeading(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
@@ -135,7 +137,7 @@ function paragraphHasAtxHeading(document: vscode.TextDocument, startLine: number
   return false;
 }
 
-// Helper: detect fenced code block ranges (``` or ~~~), allowing up to 3 leading spaces
+// Detect fenced code block ranges (``` or ~~~), allowing up to 3 leading spaces
 function getFencedCodeBlockRanges(document: vscode.TextDocument): vscode.Range[] {
   const ranges: vscode.Range[] = [];
   const openRe = /^\s{0,3}(`{3,}|~{3,})/;
@@ -179,7 +181,7 @@ function getFencedCodeBlockRanges(document: vscode.TextDocument): vscode.Range[]
   return ranges;
 }
 
-// Helper: given a set of ranges, find one that contains a line
+// Given a set of ranges, find one that contains a line
 function findRangeContainingLine(ranges: vscode.Range[], line: number): vscode.Range | undefined {
   return ranges.find(r => line >= r.start.line && line <= r.end.line);
 }
@@ -188,7 +190,7 @@ function rangeOverlapsAny(startLine: number, endLine: number, ranges: vscode.Ran
   return ranges.some(r => !(endLine < r.start.line || startLine > r.end.line));
 }
 
-// Helper: detect MDX/JSX expression ranges delimited by balanced { ... } across lines (outside fenced code)
+// Detect MDX/JSX expression ranges delimited by balanced { ... } across lines (outside fenced code)
 function getJsxExpressionRanges(document: vscode.TextDocument, fencedRanges: vscode.Range[]): vscode.Range[] {
   const ranges: vscode.Range[] = [];
   let depth = 0;
@@ -261,6 +263,172 @@ function getJsxExpressionRanges(document: vscode.TextDocument, fencedRanges: vsc
   return ranges;
 }
 
+interface LineContext {
+    type: 'list' | 'blockquote' | 'paragraph';
+    indent: string;
+    prefix: string;
+    content: string;
+}
+
+interface ParagraphSkipContext {
+  document: vscode.TextDocument;
+  lineStart: number;
+  lineEnd: number;
+  fencedRanges: vscode.Range[];
+  jsxExprRanges: vscode.Range[];
+  frontMatterRange: vscode.Range | undefined;
+  settings: ReturnType<typeof getSettings>;
+}
+
+function shouldSkipParagraph(ctx: ParagraphSkipContext): boolean {
+  const { document, lineStart, lineEnd, fencedRanges, jsxExprRanges, frontMatterRange, settings } = ctx;
+
+  // Skip if paragraph overlaps front matter
+  if (frontMatterRange && !(lineEnd < frontMatterRange.start.line || lineStart > frontMatterRange.end.line)) {
+    return true;
+  }
+
+  // Skip if paragraph overlaps fenced code or JSX expressions
+  if (rangeOverlapsAny(lineStart, lineEnd, fencedRanges) || rangeOverlapsAny(lineStart, lineEnd, jsxExprRanges)) {
+    return true;
+  }
+
+  // Skip paragraphs that include ATX headings
+  if (paragraphHasAtxHeading(document, lineStart, lineEnd)) {
+    return true;
+  }
+
+  // Skip paragraphs that contain MDX import statements
+  if (paragraphHasMdxImport(document, lineStart, lineEnd)) {
+    return true;
+  }
+
+  // Skip paragraphs that contain Markdown footnote/reference definitions
+  if (paragraphHasFootnoteDef(document, lineStart, lineEnd)) {
+    return true;
+  }
+
+  // Skip paragraphs that contain Markdown tables
+  if (paragraphHasMarkdownTable(document, lineStart, lineEnd)) {
+    return true;
+  }
+
+  // Skip paragraphs that contain only list symbols and Markdown links
+  if (paragraphHasListLinkOnly(document, lineStart, lineEnd)) {
+    return true;
+  }
+
+  // Skip first paragraph if configured
+  if (settings.neverReflowFirstParagraph) {
+    const firstPara = getFirstContentParagraphRange(document);
+    if (firstPara) {
+      const firstStart = firstPara.start.line;
+      const firstEnd = firstPara.end.line;
+      if (!(lineEnd < firstStart || lineStart > firstEnd)) {
+        return true;
+      }
+    }
+  }
+
+  // Do not touch standalone ':::' lines
+  if (lineStart === lineEnd && lineStartsWithTripleColon(document.lineAt(lineStart).text)) {
+    return true;
+  }
+
+  // Do not touch lines that only contain XML tags
+  if (lineStart === lineEnd && lineIsXmlTagOnly(document.lineAt(lineStart).text)) {
+    return true;
+  }
+
+  return false;
+}
+
+function getLineContext(line: vscode.TextLine): LineContext {
+    const text = line.text;
+    const listMatch = text.match(/^(\s*)([*\-+]|\d+\.)\s+(.*)$/);
+    
+    if (listMatch) {
+        return {
+            type: 'list',
+            indent: listMatch[1],
+            prefix: listMatch[2],
+            content: listMatch[3]
+        };
+    }
+    
+    const blockquoteMatch = text.match(/^(\s*)(>+)\s*(.*)$/);
+    if (blockquoteMatch) {
+        return {
+            type: 'blockquote',
+            indent: blockquoteMatch[1],
+            prefix: blockquoteMatch[2],
+            content: blockquoteMatch[3]
+        };
+    }
+    
+    return {
+        type: 'paragraph',
+        indent: text.match(/^(\s*)/)?.[1] || '',
+        prefix: '',
+        content: text.trim()
+    };
+}
+
+function reflowLines(
+    document: vscode.TextDocument,
+    startLine: number,
+    endLine: number,
+    preferredLineLength: number
+): string[] {
+    const lines: string[] = [];
+    const context = getLineContext(document.lineAt(startLine));
+    
+    // Collect all text
+    for (let i = startLine; i <= endLine; i++) {
+        const line = document.lineAt(i);
+        const lineContext = getLineContext(line);
+        lines.push(lineContext.content);
+    }
+    
+    // Join and split words
+    const allText = lines.join(' ').trim();
+    const words = allText.split(/\s+/);
+    
+    // Reflow into new lines
+    const reflowedLines: string[] = [];
+    let currentLine = '';
+    const prefixLength = context.indent.length + (context.prefix ? context.prefix.length + 1 : 0);
+    const effectiveLength = preferredLineLength - prefixLength;
+    
+    for (const word of words) {
+        if (currentLine === '') {
+            currentLine = word;
+        } else if ((currentLine + ' ' + word).length <= effectiveLength) {
+            currentLine += ' ' + word;
+        } else {
+            reflowedLines.push(currentLine);
+            currentLine = word;
+        }
+    }
+    
+    if (currentLine !== '') {
+        reflowedLines.push(currentLine);
+    }
+    
+    // Add prefix back
+    return reflowedLines.map((line, index) => {
+        if (context.type === 'list') {
+            return index === 0
+                ? `${context.indent}${context.prefix} ${line}`
+                : `${context.indent}${' '.repeat(context.prefix.length + 1)}${line}`;
+        } else if (context.type === 'blockquote') {
+            return `${context.indent}${context.prefix} ${line}`;
+        } else {
+            return `${context.indent}${line}`;
+        }
+    });
+}
+
 export function reflow() {
   let editor = vscode.window.activeTextEditor;
   if (!editor) {
@@ -291,70 +459,23 @@ export function reflow() {
   const selection = editor.selection;
   let sei = GetStartEndInfo(editor);
 
-  // If the computed paragraph would overlap front matter, skip
-  if (fm && !(sei.lineEnd < fm.start.line || sei.lineStart > fm.end.line)) {
+  const skipContext: ParagraphSkipContext = {
+    document: editor.document,
+    lineStart: sei.lineStart,
+    lineEnd: sei.lineEnd,
+    fencedRanges: fenced,
+    jsxExprRanges: jsxExpr,
+    frontMatterRange: fm,
+    settings
+  };
+
+  if (shouldSkipParagraph(skipContext)) {
     return;
   }
 
-  // Skip paragraphs that overlap fenced code blocks or JSX expressions
-  if (rangeOverlapsAny(sei.lineStart, sei.lineEnd, fenced) || rangeOverlapsAny(sei.lineStart, sei.lineEnd, jsxExpr)) {
-    return;
-  }
-
-  // Skip paragraphs that include ATX headings (lines starting with '#')
-  if (paragraphHasAtxHeading(editor.document, sei.lineStart, sei.lineEnd)) {
-    return;
-  }
-
-  // Skip paragraphs that contain MDX import statements
-  if (paragraphHasMdxImport(editor.document, sei.lineStart, sei.lineEnd)) {
-    return;
-  }
-
-  // Skip paragraphs that contain Markdown footnote/reference definitions
-  if (paragraphHasFootnoteDef(editor.document, sei.lineStart, sei.lineEnd)) {
-    return;
-  }
-
-  // Skip paragraphs that contain Markdown tables
-  if (paragraphHasMarkdownTable(editor.document, sei.lineStart, sei.lineEnd)) {
-    return;
-  }
-
-  // Skip paragraphs that contain only list symbols and Markdown links
-  if (paragraphHasListLinkOnly(editor.document, sei.lineStart, sei.lineEnd)) {
-    return;
-  }
-
-  // Skip first paragraph if configured
-  if (settings.neverReflowFirstParagraph) {
-    const firstPara = getFirstContentParagraphRange(editor.document);
-    if (firstPara) {
-      const firstStart = firstPara.start.line;
-      const firstEnd = firstPara.end.line;
-      if (!(sei.lineEnd < firstStart || sei.lineStart > firstEnd)) {
-        return;
-      }
-    }
-  }
-
-  // Do not touch standalone ':::' lines
-  if (sei.lineStart === sei.lineEnd && lineStartsWithTripleColon(editor.document.lineAt(sei.lineStart).text)) {
-    return;
-  }
-
-  // Do not touch lines that only contain XML tags
-  if (sei.lineStart === sei.lineEnd && lineIsXmlTagOnly(editor.document.lineAt(sei.lineStart).text)) {
-    return;
-  }
-
-  let len = editor.document.lineAt(sei.lineEnd).text.length;
-  let range = new vscode.Range(sei.lineStart, 0, sei.lineEnd, len);
-  let text = editor.document.getText(range);
-
-  let reflowedText = getReflowedText(sei, text, settings);
+  const reflowedLines = reflowLines(editor.document, sei.lineStart, sei.lineEnd, settings.preferredLineLength);
   let applied = editor.edit(function (textEditorEdit) {
-    textEditorEdit.replace(range, reflowedText);
+    textEditorEdit.replace(new vscode.Range(sei.lineStart, 0, sei.lineEnd, editor.document.lineAt(sei.lineEnd).text.length), reflowedLines.join('\n'));
   });
 
   // reset selection (TODO may be contra-intuitive... maybe rather reset to single position, always?)
@@ -449,78 +570,26 @@ function computeReflowEdits(
       otherInfo: o
     };
 
-    // Skip if paragraph overlaps front matter
-    if (fm && !(sei.lineEnd < fm.start.line || sei.lineStart > fm.end.line)) {
-      i = Math.max(i, fm.end.line + 1);
-      continue;
-    }
-
-    // Skip if paragraph overlaps fenced code or JSX expressions
-    if (rangeOverlapsAny(sei.lineStart, sei.lineEnd, fenced) || rangeOverlapsAny(sei.lineStart, sei.lineEnd, jsxExpr)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
-    // Skip paragraphs that include ATX headings (lines starting with '#')
-    if (paragraphHasAtxHeading(document, sei.lineStart, sei.lineEnd)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
-    // Skip paragraphs that contain MDX import statements
-    if (paragraphHasMdxImport(document, sei.lineStart, sei.lineEnd)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
-    // Skip paragraphs that contain Markdown footnote/reference definitions
-    if (paragraphHasFootnoteDef(document, sei.lineStart, sei.lineEnd)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
-    // Skip paragraphs that contain Markdown tables
-    if (paragraphHasMarkdownTable(document, sei.lineStart, sei.lineEnd)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
-    // Skip paragraphs that contain only list symbols and Markdown links
-    if (paragraphHasListLinkOnly(document, sei.lineStart, sei.lineEnd)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
-    // Skip first paragraph if configured
-    if (settings.neverReflowFirstParagraph) {
-      const firstPara = getFirstContentParagraphRange(document);
-      if (firstPara) {
-        const firstStart = firstPara.start.line;
-        const firstEnd = firstPara.end.line;
-        if (!(sei.lineEnd < firstStart || sei.lineStart > firstEnd)) {
-          i = sei.lineEnd + 1;
-          continue;
-        }
-      }
-    }
-
-    // Do not touch standalone ':::' lines
-    if (sei.lineStart === sei.lineEnd && lineStartsWithTripleColon(document.lineAt(sei.lineStart).text)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
-    // Do not touch lines that only contain XML tags
-    if (sei.lineStart === sei.lineEnd && lineIsXmlTagOnly(document.lineAt(sei.lineStart).text)) {
-      i = sei.lineEnd + 1;
-      continue;
-    }
-
     // For range formatting: skip paragraphs outside or crossing the selection
     if (hasRange) {
       if (sei.lineEnd < startLine) { i = sei.lineEnd + 1; continue; }
       if (sei.lineStart > endLine) { break; }
       if (sei.lineStart < startLine || sei.lineEnd > endLine) { i = sei.lineEnd + 1; continue; }
+    }
+
+    const skipContext: ParagraphSkipContext = {
+      document,
+      lineStart: sei.lineStart,
+      lineEnd: sei.lineEnd,
+      fencedRanges: fenced,
+      jsxExprRanges: jsxExpr,
+      frontMatterRange: fm,
+      settings
+    };
+
+    if (shouldSkipParagraph(skipContext)) {
+      i = sei.lineEnd + 1;
+      continue;
     }
 
     const rng = new vscode.Range(
