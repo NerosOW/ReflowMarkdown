@@ -17,18 +17,26 @@ import {
 // Supports YAML (--- ... --- or ...), and TOML (+++ ... +++).
 // If unterminated, treat front matter as extending to the end of the document (to avoid accidental edits).
 function getFrontMatterRange(document: vscode.TextDocument): vscode.Range | undefined {
-  if (document.lineCount === 0) return undefined;
+  if (document.lineCount === 0) {
+    return undefined;
+  }
 
   // find first non-empty line
   let first = 0;
-  while (first < document.lineCount && document.lineAt(first).text.trim() === "") first++;
+  while (first < document.lineCount && document.lineAt(first).text.trim() === "") {
+    first++;
+  }
 
-  if (first >= document.lineCount) return undefined;
+  if (first >= document.lineCount) {
+    return undefined;
+  }
 
   const firstText = document.lineAt(first).text;
   const isYaml = /^\s*---\s*$/.test(firstText);
   const isToml = /^\s*\+\+\+\s*$/.test(firstText);
-  if (!isYaml && !isToml) return undefined;
+  if (!isYaml && !isToml) {
+    return undefined;
+  }
 
   const closing = isYaml ? /^\s*(---|\.\.\.)\s*$/ : /^\s*\+\+\+\s*$/;
   for (let i = first + 1; i < document.lineCount; i++) {
@@ -68,7 +76,9 @@ function getFirstContentParagraphRange(document: vscode.TextDocument): vscode.Ra
     }
     break;
   }
-  if (i >= lineCount) return undefined;
+  if (i >= lineCount) {
+    return undefined;
+  }
 
   const lineAtFunc = (line: number) => document.lineAt(line);
   const midLine = document.lineAt(i);
@@ -221,7 +231,9 @@ function getJsxExpressionRanges(document: vscode.TextDocument, fencedRanges: vsc
       if (ch === '`') {
         // Count run length
         let run = 1;
-        while (idx + run < text.length && text[idx + run] === '`') run++;
+        while (idx + run < text.length && text[idx + run] === '`') {
+          run++;
+        }
         if (!inInline) {
           inInline = true;
           inlineTickRun = run;
@@ -233,7 +245,9 @@ function getJsxExpressionRanges(document: vscode.TextDocument, fencedRanges: vsc
         continue;
       }
 
-      if (inInline) continue;
+      if (inInline) {
+        continue;
+      }
 
       if (ch === '{') {
         depth++;
