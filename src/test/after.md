@@ -53,12 +53,12 @@ This is a Header Made With Dashes And It is Exactly 70 Characters Long
    > start character (`>`) followed only by zero or more spaces.
    > 
    > > This is a nested blockquote with no empty line between it and
-   > > the previous blockquote. It should be reflowed as a separate
-   > > paragraph as well. Its formatting should also be fixed so that
+   > > the previous blockquote.  It should be reflowed as a separate
+   > > paragraph as well.  Its formatting should also be fixed so that
    > > the blockquote characters are alinged properly.
    > > 
    > > The level 2 blockquote also has two paragraphs in it, which are
-   > > separated by an empty level 2 blockquote line. It should be
+   > > separated by an empty level 2 blockquote line.  It should be
    > > reflowed as two separate paragraphs as well.
 
 `{"settings": {"doubleSpaceBetweenSentences":false }}`
