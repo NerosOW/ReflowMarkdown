@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import {
   StartEndInfo,
+  getFrontMatterRange,
   getLineIndent,
   getReflowedText,
   getStartLine,
@@ -12,43 +13,6 @@ import {
 } from "./testable";
 
 // Helper functions
-
-// Detect front matter range at the top of the document.
-// Supports YAML (--- ... --- or ...), and TOML (+++ ... +++).
-// If unterminated, treat front matter as extending to the end of the document (to avoid accidental edits).
-function getFrontMatterRange(document: vscode.TextDocument): vscode.Range | undefined {
-  if (document.lineCount === 0) {
-    return undefined;
-  }
-
-  // find first non-empty line
-  let first = 0;
-  while (first < document.lineCount && document.lineAt(first).text.trim() === "") {
-    first++;
-  }
-
-  if (first >= document.lineCount) {
-    return undefined;
-  }
-
-  const firstText = document.lineAt(first).text;
-  const isYaml = /^\s*---\s*$/.test(firstText);
-  const isToml = /^\s*\+\+\+\s*$/.test(firstText);
-  if (!isYaml && !isToml) {
-    return undefined;
-  }
-
-  const closing = isYaml ? /^\s*(---|\.\.\.)\s*$/ : /^\s*\+\+\+\s*$/;
-  for (let i = first + 1; i < document.lineCount; i++) {
-    if (closing.test(document.lineAt(i).text)) {
-      return new vscode.Range(first, 0, i, document.lineAt(i).text.length);
-    }
-  }
-
-  // Unterminated front matter -> skip everything after start
-  const lastLine = document.lineCount - 1;
-  return new vscode.Range(first, 0, lastLine, document.lineAt(lastLine).text.length);
-}
 
 // MDX import detection (matches `import X from "..."` and `import "..."`)
 const MDX_IMPORT_RE = /^\s*import\s+(?:[^'";]+?\s+from\s+)?['"][^'"]+['"]\s*;?\s*$/;
