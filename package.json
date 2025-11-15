@@ -2,7 +2,7 @@
   "name": "reflow-markdown",
   "displayName": "Reflow Markdown",
   "description": "Format lines in markdown headers, paragraphs, blockquotes, lists, etc. to a preferred line-length.",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "publisher": "marvhen",
   "icon": "img/logo.png",
   "license": "MIT",
@@ -27,7 +27,9 @@
     "color": "#000000",
     "theme": "dark"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
@@ -62,6 +64,11 @@
             "The link text and the link url are started on the next line, which itself may be longer than the preferrd length.",
             "The link text and the link url are kept on the current line, resulting in it being longer than the preferred length."
           ]
+        },
+        "reflowMarkdown.neverReflowFirstParagraph": {
+          "type": "boolean",
+          "default": false,
+          "description": "Never reflow the first paragraph of a document."
         }
       }
     },
@@ -77,7 +84,12 @@
         "key": "alt+q",
         "when": "editorTextFocus"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "[markdown]": {
+        "editor.defaultFormatter": "marvhen.reflow-markdown"
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

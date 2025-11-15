@@ -1,7 +1,9 @@
-import { TextEditor, Selection, Position, TextLine, WorkspaceConfiguration } from "vscode";
+import { TextEditor, Selection, Position, TextLine, WorkspaceConfiguration, TextDocument, Range } from "vscode";
 
-
-const HYPERLINK_REGEX = /\[.*?\]/g;
+import {
+    HYPERLINK_RE,
+    MDX_IMPORT_RE,
+} from "./reConsts";
 
 export interface Indents {
     firstLine: string;
@@ -36,18 +38,20 @@ export interface Settings  {
     preferredLineLength: number,
     doubleSpaceBetweenSentences: boolean,
     resizeHeaderDashLines: boolean,
-    wrapLongLinks: wrapLongLinksOptions
+    wrapLongLinks: wrapLongLinksOptions,
+    neverReflowFirstParagraph: boolean
 }
 
 const DEFAULTSETTINGS : Settings = {
     preferredLineLength: 80,
     doubleSpaceBetweenSentences: false,
     resizeHeaderDashLines: true,
-    wrapLongLinks: wrapLongLinksOptions.wrap
+    wrapLongLinks: wrapLongLinksOptions.wrap,
+    neverReflowFirstParagraph: false
 };
 
 export function wordIsLink(word: string) {
-    return word.match(HYPERLINK_REGEX);
+    return word.match(HYPERLINK_RE);
 }
 
 export function lineTooLong(line: string, wrapAt: number): boolean {
@@ -71,7 +75,7 @@ function lineConsistsOnlyOfTheIndents(line: string, lineIndex: number, sei: Star
 // that is highly unlikely to be present.  The \x08 (backspace) character is a
 // good candidate...
 export function replaceSpacesInLinkTextWithBs(txt: string): string {
-    return txt.replace(HYPERLINK_REGEX, (substr, ...args) => {
+    return txt.replace(HYPERLINK_RE, (substr, ...args) => {
         return substr.replace(/\s/g, "\x08"); // x08 is hex ascii code for the 'backspace' character
     });
 
@@ -309,6 +313,16 @@ export function getStartLine(lineAtFunc: (line: number) => TextLine, midLine: Te
         return midLine;
     }
 
+    // If the current line starts with ':::', it is a start line
+    if (isTripleColonFence(midLine.text)) {
+        return midLine;
+    }
+
+    // If the current line only contains an XML tag, it is a start line
+    if (isXmlTagOnly(midLine.text)) {
+        return midLine;
+    }
+
     // If the current line is an empty blockquote line, it is a start line
     if (isEmptyBlockQuote(midLine.text)) {
         return midLine;
@@ -327,6 +341,16 @@ export function getStartLine(lineAtFunc: (line: number) => TextLine, midLine: Te
 
     // If the prev line is empty, this line is the start
     if (prevLine.isEmptyOrWhitespace) {
+        return midLine;
+    }
+
+    // If the prev line is a ':::' fence, this line is the start
+    if (isTripleColonFence(prevLine.text)) {
+        return midLine;
+    }
+
+    // If the prev line only contains an XML tag, this line is the start
+    if (isXmlTagOnly(prevLine.text)) {
         return midLine;
     }
 
@@ -373,6 +397,16 @@ export function getEndLine(lineAtFunc: (line: number) => TextLine, midLine: Text
         return midLine;
     }
 
+    // If the current line starts with ':::', it is an end point
+    if (isTripleColonFence(midLine.text)) {
+        return midLine;
+    }
+
+    // If the current line only contains an XML tag, it is an end point
+    if (isXmlTagOnly(midLine.text)) {
+        return midLine;
+    }
+
     // If the current line is an empty blockquote line, it is an end point
     if (isEmptyBlockQuote(midLine.text)) {
         return midLine;
@@ -398,6 +432,16 @@ export function getEndLine(lineAtFunc: (line: number) => TextLine, midLine: Text
 
     // if the next line is empty, this line is the end
     if (nextLine.isEmptyOrWhitespace) {
+        return midLine;
+    }
+
+    // If the next line is a ':::' fence, this line is the end
+    if (isTripleColonFence(nextLine.text)) {
+        return midLine;
+    }
+
+    // If the next line only contains an XML tag, this line is the end
+    if (isXmlTagOnly(nextLine.text)) {
         return midLine;
     }
 
@@ -440,9 +484,69 @@ export function getSettings(wsConfig?: WorkspaceConfiguration): Settings {
             preferredLineLength: wsConfig.get("preferredLineLength", DEFAULTSETTINGS.preferredLineLength),
             doubleSpaceBetweenSentences: wsConfig.get("doubleSpaceBetweenSentences", DEFAULTSETTINGS.doubleSpaceBetweenSentences),
             resizeHeaderDashLines: wsConfig.get("resizeHeaderDashLines", DEFAULTSETTINGS.resizeHeaderDashLines),
-            wrapLongLinks: wsConfig.get("wrapLongLinks", DEFAULTSETTINGS.wrapLongLinks)
+            wrapLongLinks: wsConfig.get("wrapLongLinks", DEFAULTSETTINGS.wrapLongLinks),
+            neverReflowFirstParagraph: wsConfig.get("neverReflowFirstParagraph", DEFAULTSETTINGS.neverReflowFirstParagraph)
         };
     } else {
         return DEFAULTSETTINGS;
     }
+}
+
+// Recognize MDX/admonition-style fences that start with ':::'
+export function isTripleColonFence(text: string): boolean {
+    return /^\s*:::/.test(text);
+}
+
+// Recognize lines that only contain an opening or closing XML tag or HTML comment
+export function isXmlTagOnly(text: string): boolean {
+    const xmlTagRe = /^\s*<\/?[a-zA-Z][a-zA-Z0-9\-]*(?:\s[^>]*)?\/?>\s*$/;
+    const htmlCommentRe = /^\s*<!--.*?-->\s*$/;
+    return xmlTagRe.test(text) || htmlCommentRe.test(text);
+}
+
+// Detect front matter range at the top of the document.
+// Supports YAML (--- ... --- or ...), and TOML (+++ ... +++).
+// If unterminated, treat front matter as extending to the end of the document (to avoid accidental edits).
+export function getFrontMatterRange(document: TextDocument): Range | undefined {
+  if (document.lineCount === 0) {
+    return undefined;
+  }
+
+  // find first non-empty line
+  let first = 0;
+  while (first < document.lineCount && document.lineAt(first).text.trim() === "") {
+    first++;
+  }
+
+  if (first >= document.lineCount) {
+    return undefined;
+  }
+
+  const firstText = document.lineAt(first).text;
+  const isYaml = /^\s*---\s*$/.test(firstText);
+  const isToml = /^\s*\+\+\+\s*$/.test(firstText);
+  if (!isYaml && !isToml) {
+    return undefined;
+  }
+
+  const closing = isYaml ? /^\s*(---|\.\.\.)\s*$/ : /^\s*\+\+\+\s*$/;
+  for (let i = first + 1; i < document.lineCount; i++) {
+    if (closing.test(document.lineAt(i).text)) {
+      return new Range(first, 0, i, document.lineAt(i).text.length);
+    }
+  }
+
+  // Unterminated front matter -> skip everything after start
+  const lastLine = document.lineCount - 1;
+  return new Range(first, 0, lastLine, document.lineAt(lastLine).text.length);
+}
+
+// Check if any line in the specified paragraph range contains an MDX import statement
+export function paragraphHasMdxImport(document: TextDocument, startLine: number, endLine: number): boolean {
+  for (let i = startLine; i <= endLine; i++) {
+    if (MDX_IMPORT_RE.test(document.lineAt(i).text)) {
+      return true;
+    }
+  }
+  return false;
 }
