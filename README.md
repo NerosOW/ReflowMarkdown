@@ -38,7 +38,6 @@ workspace settings:
 To manually trigger formatting, set `formatOnSave` to `false` and use the
 `Format Document` command from the Command Palette (default shortcut: `shift+alt+f`).
 
-
 Extension Settings
 ------------------
 
