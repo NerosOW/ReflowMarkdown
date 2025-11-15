@@ -1,7 +1,8 @@
 import { TextEditor, Selection, Position, TextLine, WorkspaceConfiguration, TextDocument, Range } from "vscode";
 
-
-const HYPERLINK_REGEX = /\[.*?\]/g;
+import {
+    HYPERLINK_RE,
+} from "./reConsts";
 
 export interface Indents {
     firstLine: string;
@@ -49,7 +50,7 @@ const DEFAULTSETTINGS : Settings = {
 };
 
 export function wordIsLink(word: string) {
-    return word.match(HYPERLINK_REGEX);
+    return word.match(HYPERLINK_RE);
 }
 
 export function lineTooLong(line: string, wrapAt: number): boolean {
@@ -73,7 +74,7 @@ function lineConsistsOnlyOfTheIndents(line: string, lineIndex: number, sei: Star
 // that is highly unlikely to be present.  The \x08 (backspace) character is a
 // good candidate...
 export function replaceSpacesInLinkTextWithBs(txt: string): string {
-    return txt.replace(HYPERLINK_REGEX, (substr, ...args) => {
+    return txt.replace(HYPERLINK_RE, (substr, ...args) => {
         return substr.replace(/\s/g, "\x08"); // x08 is hex ascii code for the 'backspace' character
     });
 

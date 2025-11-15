@@ -1,6 +1,19 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+
+import {
+  MDX_IMPORT_RE,
+  TRIPLE_COLON_RE,
+  XML_TAG_ONLY_RE,
+  HTML_COMMENT_ONLY_RE,
+  FOOTNOTE_DEF_RE,
+  LIST_LINK_ONLY_RE,
+  MD_TABLE_SEPARATOR_RE,
+  MD_TABLE_ROW_RE,
+  ATX_HEADING_RE,
+} from "./reConsts";
+
 import {
   StartEndInfo,
   getFrontMatterRange,
@@ -14,8 +27,6 @@ import {
 
 // Helper functions
 
-// MDX import detection (matches `import X from "..."` and `import "..."`)
-const MDX_IMPORT_RE = /^\s*import\s+(?:[^'";]+?\s+from\s+)?['"][^'"]+['"]\s*;?\s*$/;
 function paragraphHasMdxImport(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
     if (MDX_IMPORT_RE.test(document.lineAt(i).text)) {
@@ -52,21 +63,14 @@ function getFirstContentParagraphRange(document: vscode.TextDocument): vscode.Ra
   return new vscode.Range(s.lineNumber, 0, e.lineNumber, document.lineAt(e.lineNumber).text.length);
 }
 
-// Lines starting with ':::'
-const TRIPLE_COLON_RE = /^\s*:::/;
 function lineStartsWithTripleColon(text: string): boolean {
   return TRIPLE_COLON_RE.test(text);
 }
 
-// Lines that only contain an opening or closing XML tag or HTML comment
-const XML_TAG_ONLY_RE = /^\s*<\/?[a-zA-Z][a-zA-Z0-9\-]*(?:\s[^>]*)?\/?>\s*$/;
-const HTML_COMMENT_ONLY_RE = /^\s*<!--.*?-->\s*$/;
 function lineIsXmlTagOnly(text: string): boolean {
   return XML_TAG_ONLY_RE.test(text) || HTML_COMMENT_ONLY_RE.test(text);
 }
 
-// Markdown footnote or reference definition lines, e.g. `[tags]: /path` or `[^1]: text`
-const FOOTNOTE_DEF_RE = /^\s*\[\^?[^\]]+\]:[ \t]+/;
 function paragraphHasFootnoteDef(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
     if (FOOTNOTE_DEF_RE.test(document.lineAt(i).text)) {
@@ -76,8 +80,6 @@ function paragraphHasFootnoteDef(document: vscode.TextDocument, startLine: numbe
   return false;
 }
 
-// Lines that only contain a list symbol (- or *) and a Markdown link
-const LIST_LINK_ONLY_RE = /^\s*[-*]\s+\[[^\]]*\]\([^)]*\)\.?\s*$/;
 function paragraphHasListLinkOnly(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
     if (LIST_LINK_ONLY_RE.test(document.lineAt(i).text)) {
@@ -87,9 +89,6 @@ function paragraphHasListLinkOnly(document: vscode.TextDocument, startLine: numb
   return false;
 }
 
-// Markdown table detection (pipe rows and header separator lines)
-const MD_TABLE_SEPARATOR_RE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
-const MD_TABLE_ROW_RE = /^\s*\|.*\|.*$/;
 function paragraphHasMarkdownTable(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
     const t = document.lineAt(i).text;
@@ -100,8 +99,6 @@ function paragraphHasMarkdownTable(document: vscode.TextDocument, startLine: num
   return false;
 }
 
-// ATX heading lines starting with up to 3 spaces and 1-6 '#'
-const ATX_HEADING_RE = /^\s{0,3}#{1,6}(?:\s|$)/;
 function paragraphHasAtxHeading(document: vscode.TextDocument, startLine: number, endLine: number): boolean {
   for (let i = startLine; i <= endLine; i++) {
     if (ATX_HEADING_RE.test(document.lineAt(i).text)) {
