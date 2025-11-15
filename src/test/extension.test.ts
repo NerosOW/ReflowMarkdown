@@ -18,7 +18,8 @@ import {
   getEndLine,
   Settings,
   getSettings,
-  OtherInfo
+  OtherInfo,
+  getFrontMatterRange
 } from "../testable";
 
 suite('Extension Test Suite', () => {
@@ -30,7 +31,6 @@ suite('Extension Test Suite', () => {
     assert.strictEqual(replaceSpacesInLinkTextWithBs("[a b]"             /**/), "[a\x08b]"                /**/);
     assert.strictEqual(replaceSpacesInLinkTextWithBs("asdf [a b a] asdf" /**/), "asdf [a\x08b\x08a] asdf" /**/);
   });
-
   test("replaceSpacesInInlineCodeWithBs", () =>{
     assert.strictEqual(replaceSpacesInInlineCodeWithBs("`abc`"       /**/), "`abc`"               /**/);
     assert.strictEqual(replaceSpacesInInlineCodeWithBs("`a b`"       /**/), "`a\x08b`"            /**/);
@@ -187,9 +187,103 @@ suite('Extension Test Suite', () => {
 
     assert.equal(linesAfter.length, nextAfterLineToTest, "after.md has more lines than expected...are there trailing CRLFs?");
   });
+  test("getFrontMatterRange_returns_undefined_if_no_frontmatter", async () => {
+      const content = `# My First Post
+
+This is a simple Markdown file with no YAML frontmatter at the top.
+      `;
+      const doc = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+      await vscode.window.showTextDocument(doc);
+      const frontMatterRange = getFrontMatterRange(doc);
+      assert.strictEqual(frontMatterRange, undefined);
+  });
+  test("getFrontMatterRange_returns_the_expected_start_and_end_of_yaml_frontmatter", async () => {
+      const content = `---
+title: "My First Post"
+date: 2025-11-14
+tags:
+  - notes
+  - markdown
+draft: false
+---
+
+# My First Post
+
+This is a simple Markdown file with YAML frontmatter at the top.
+      `;
+      const doc = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+      await vscode.window.showTextDocument(doc);
+      const frontMatterRange = getFrontMatterRange(doc);
+      assert.ok(frontMatterRange);
+      if (frontMatterRange) {
+        assert.strictEqual(frontMatterRange.start.line, 0);
+        assert.strictEqual(frontMatterRange.end.line, 7);
+      }
+  });
+  test("getFrontMatterRange_returns_the_expected_start_and_end_of_toml_frontmatter", async () => {
+      const content = `+++
+title = "My First TOML Post"
+date = 2025-11-14T12:00:00Z
+tags = ["markdown", "toml", "example"]
+draft = false
++++
+
+# My First Post
+
+This is a simple Markdown file with TOML frontmatter at the top.
+      `;
+      const doc = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+      await vscode.window.showTextDocument(doc);
+      const frontMatterRange = getFrontMatterRange(doc);
+      assert.ok(frontMatterRange);
+      if (frontMatterRange) {
+        assert.strictEqual(frontMatterRange.start.line, 0);
+        assert.strictEqual(frontMatterRange.end.line, 5);
+      }
+  });
+  test("getFrontMatterRange_returns_the_expected_start_and_end_of_unterminated_yaml_frontmatter", async () => {
+      const content = `---
+title: "My First Post"
+date: 2025-11-14
+tags:
+  - notes
+  - markdown
+draft: false
+
+# My First Post
+
+This is a simple Markdown file with unterminated YAML frontmatter at the top.
+      `;
+      const doc = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+      await vscode.window.showTextDocument(doc);
+      const frontMatterRange = getFrontMatterRange(doc);
+      assert.ok(frontMatterRange);
+      if (frontMatterRange) {
+        assert.strictEqual(frontMatterRange.start.line, 0);
+        assert.strictEqual(frontMatterRange.end.line, 11);
+      }
+  });
+  test("getFrontMatterRange_returns_the_expected_start_and_end_of_unterminated_toml_frontmatter", async () => {
+      const content = `+++
+title = "My First TOML Post"
+date = 2025-11-14T12:00:00Z
+tags = ["markdown", "toml", "example"]
+draft = false
+
+# My First Post
+
+This is a simple Markdown file with unterminated TOML frontmatter at the top.
+      `;
+      const doc = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+      await vscode.window.showTextDocument(doc);
+      const frontMatterRange = getFrontMatterRange(doc);
+      assert.ok(frontMatterRange);
+      if (frontMatterRange) {
+        assert.strictEqual(frontMatterRange.start.line, 0);
+        assert.strictEqual(frontMatterRange.end.line, 9);
+      }
+  });
 });
-
-
 
 // takes an array of lines and an index and turns it into a mock vscode text line
 class MockTextLine implements vscode.TextLine {
