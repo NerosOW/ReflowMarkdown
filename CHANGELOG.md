@@ -7,10 +7,13 @@ for releases but not guaranteed...)*
 3.2.0
 -----
 
+- Several features added to resolve [issue #7](https://github.com/marvhen/ReflowMarkdown/issues/7)
+  and [issue # 4](https://github.com/marvhen/ReflowMarkdown/issues/4)
+  ...thank you [Lars Wilhelmer](https://github.com/wilhelmer) for this code!
 - The plugin can now be registered as a formatter,
   so that it automatically reflows Markdown files on save.
 - When formatting, ignores Markdown headings, tables, code blocks,
-  footnotes, and YAML front matter.
+  footnotes, and YAML/TOML front matter.
 - Properly handles Docusaurus admonitions (:::) and import statements.
 - Properly handles lines that only include a list item with a link.
 - Added the [reflowMarkdown.neverReflowFirstParagraph](README.md#Extension-Settings)
