@@ -2,6 +2,7 @@ import { TextEditor, Selection, Position, TextLine, WorkspaceConfiguration, Text
 
 import {
     HYPERLINK_RE,
+    MDX_IMPORT_RE,
 } from "./reConsts";
 
 export interface Indents {
@@ -538,4 +539,14 @@ export function getFrontMatterRange(document: TextDocument): Range | undefined {
   // Unterminated front matter -> skip everything after start
   const lastLine = document.lineCount - 1;
   return new Range(first, 0, lastLine, document.lineAt(lastLine).text.length);
+}
+
+// Check if any line in the specified paragraph range contains an MDX import statement
+export function paragraphHasMdxImport(document: TextDocument, startLine: number, endLine: number): boolean {
+  for (let i = startLine; i <= endLine; i++) {
+    if (MDX_IMPORT_RE.test(document.lineAt(i).text)) {
+      return true;
+    }
+  }
+  return false;
 }

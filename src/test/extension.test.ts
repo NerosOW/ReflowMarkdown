@@ -19,7 +19,8 @@ import {
   Settings,
   getSettings,
   OtherInfo,
-  getFrontMatterRange
+  getFrontMatterRange,
+  paragraphHasMdxImport
 } from "../testable";
 
 suite('Extension Test Suite', () => {
@@ -282,6 +283,18 @@ This is a simple Markdown file with unterminated TOML frontmatter at the top.
         assert.strictEqual(frontMatterRange.start.line, 0);
         assert.strictEqual(frontMatterRange.end.line, 9);
       }
+  });
+  test("paragraphHasMdxImport_detects_mdx_imports", async () => {
+      const content = `import Something from "somewhere";
+# My First Post
+
+This is a simple Markdown file with unterminated TOML frontmatter at the top.
+      `;
+
+      const doc = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+      await vscode.window.showTextDocument(doc);
+      assert.strictEqual(paragraphHasMdxImport(doc, 0, 0), true);
+      assert.strictEqual(paragraphHasMdxImport(doc, 1, 3), false);
   });
 });
 
